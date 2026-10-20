@@ -1,5 +1,7 @@
 (async function () {
+  const stageEl = document.getElementById('stage');
   const bookEl = document.getElementById('book');
+  const dragLayer = document.getElementById('dragLayer');
   const pageIndicator = document.getElementById('pageIndicator');
   const tocList = document.getElementById('tocList');
   const prevBtn = document.getElementById('prevBtn');
@@ -207,6 +209,7 @@
     bookEl.style.transform = `scale(${zoomLevel})`;
     zoomInBtn.disabled = zoomLevel >= ZOOM_MAX;
     zoomOutBtn.disabled = zoomLevel <= ZOOM_MIN;
+    document.body.classList.toggle('zoomed', zoomLevel > 1);
   }
 
   zoomInBtn.addEventListener('click', () => {
@@ -218,6 +221,42 @@
     applyZoom();
   });
   applyZoom();
+
+  // ---- 확대 상태에서 드래그로 이동(패닝) ----
+  let isPanning = false;
+  let panStart = { x: 0, y: 0, scrollLeft: 0, scrollTop: 0 };
+
+  function panTo(clientX, clientY) {
+    stageEl.scrollLeft = panStart.scrollLeft - (clientX - panStart.x);
+    stageEl.scrollTop = panStart.scrollTop - (clientY - panStart.y);
+  }
+
+  dragLayer.addEventListener('mousedown', (e) => {
+    isPanning = true;
+    dragLayer.classList.add('dragging');
+    panStart = { x: e.clientX, y: e.clientY, scrollLeft: stageEl.scrollLeft, scrollTop: stageEl.scrollTop };
+    e.preventDefault();
+  });
+  window.addEventListener('mousemove', (e) => {
+    if (!isPanning) return;
+    panTo(e.clientX, e.clientY);
+  });
+  window.addEventListener('mouseup', () => {
+    isPanning = false;
+    dragLayer.classList.remove('dragging');
+  });
+
+  dragLayer.addEventListener('touchstart', (e) => {
+    const t = e.touches[0];
+    isPanning = true;
+    panStart = { x: t.clientX, y: t.clientY, scrollLeft: stageEl.scrollLeft, scrollTop: stageEl.scrollTop };
+  }, { passive: true });
+  dragLayer.addEventListener('touchmove', (e) => {
+    if (!isPanning) return;
+    const t = e.touches[0];
+    panTo(t.clientX, t.clientY);
+  }, { passive: true });
+  window.addEventListener('touchend', () => { isPanning = false; });
 
   // ---- 전체화면 ----
   fsBtn.addEventListener('click', () => {
