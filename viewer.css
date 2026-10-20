@@ -12,7 +12,9 @@ html, body {
 body {
   color: #eee;
   background:
-    radial-gradient(ellipse at 50% 30%, #e4e3df 0%, #cfcecb 60%, #bdbcb8 100%);
+    repeating-linear-gradient(45deg, rgba(255,255,255,0.5) 0px, rgba(255,255,255,0.5) 1px, transparent 1px, transparent 5px),
+    repeating-linear-gradient(-45deg, rgba(0,0,0,0.03) 0px, rgba(0,0,0,0.03) 1px, transparent 1px, transparent 5px),
+    radial-gradient(ellipse at 50% 30%, #e6e5e1 0%, #cfcecb 60%, #b7b6b1 100%);
 }
 
 #stage {
@@ -113,6 +115,25 @@ body.zoomed #dragLayer { display: block; }
 .toolIcon:hover { background: rgba(255,255,255,0.15); }
 .toolIcon:disabled { opacity: 0.35; cursor: default; }
 .toolIcon:disabled:hover { background: none; }
+
+.toolIcon.active { color: #ff9500; }
+.toolIcon.active:hover { background: rgba(255,149,0,0.15); }
+
+/* ---- 더보기 팝업 (북마크/소리/자동넘김/전체화면) ---- */
+#moreMenu {
+  position: absolute;
+  bottom: calc(100% + 10px);
+  right: 6px;
+  display: none;
+  flex-direction: column;
+  gap: 2px;
+  padding: 6px;
+  background: rgba(24,24,24,0.9);
+  backdrop-filter: blur(6px);
+  border-radius: 20px;
+  box-shadow: 0 8px 24px rgba(0,0,0,0.35);
+}
+body.moreOpen #moreMenu { display: flex; }
 
 .toolDivider {
   width: 1px;
@@ -277,6 +298,15 @@ body.thumbOpen #thumbPanel {
 }
 .thumbItem:hover { border-color: rgba(255,255,255,0.35); }
 .thumbItem.active { border-color: #ff9500; }
+.thumbItem.bookmarked::after {
+  content: "\2605";
+  position: absolute;
+  top: 2px;
+  right: 4px;
+  font-size: 13px;
+  color: #ff9500;
+  text-shadow: 0 0 3px rgba(0,0,0,0.9);
+}
 .thumbItem img {
   display: block;
   width: 100%;

@@ -16,10 +16,18 @@
   const thumbCloseBtn = document.getElementById('thumbCloseBtn');
   const thumbOverlay = document.getElementById('thumbOverlay');
   const thumbGrid = document.getElementById('thumbGrid');
+  const firstBtn = document.getElementById('firstBtn');
+  const lastBtn = document.getElementById('lastBtn');
+  const moreBtn = document.getElementById('moreBtn');
+  const moreMenu = document.getElementById('moreMenu');
+  const bookmarkBtn = document.getElementById('bookmarkBtn');
+  const soundBtn = document.getElementById('soundBtn');
+  const autoplayBtn = document.getElementById('autoplayBtn');
 
   const params = new URLSearchParams(location.search);
   const book = params.get('book') || 'sme-booklet';
   const prefix = `books/${book}/`;
+  const bookKey = book || 'default';
 
   const [pagesConfig, toc] = await Promise.all([
     fetch(prefix + 'pages.json').then(r => r.json()),
@@ -130,6 +138,7 @@
     pageFlip.loadFromImages(urls);
     pageFlip.on('flip', updateIndicator);
     pageFlip.on('init', updateIndicator);
+    pageFlip.on('flip', playFlipSound);
   }
 
   buildBook();
@@ -139,10 +148,15 @@
     pageIndicator.textContent = `${idx + 1} / ${pagesConfig.total}`;
     highlightActiveToc(idx + 1);
     thumbItems.forEach((el, i) => el.classList.toggle('active', i === idx));
+    updateBookmarkBtn(idx + 1);
+    firstBtn.disabled = idx === 0;
+    lastBtn.disabled = idx === pagesConfig.total - 1;
   }
 
-  prevBtn.addEventListener('click', () => pageFlip.flipPrev());
-  nextBtn.addEventListener('click', () => pageFlip.flipNext());
+  prevBtn.addEventListener('click', () => { stopAutoplay(); pageFlip.flipPrev(); });
+  nextBtn.addEventListener('click', () => { stopAutoplay(); pageFlip.flipNext(); });
+  firstBtn.addEventListener('click', () => { stopAutoplay(); pageFlip.turnToPage(0); });
+  lastBtn.addEventListener('click', () => { stopAutoplay(); pageFlip.turnToPage(pagesConfig.total - 1); });
 
   window.addEventListener('keydown', (e) => {
     if (e.key === 'ArrowLeft') pageFlip.flipPrev();
@@ -153,6 +167,7 @@
   const tocItems = []; // [{el, page}] in page order
 
   function gotoPage(page) {
+    stopAutoplay();
     pageFlip.flip(Number(page) - 1);
     closeToc();
   }
@@ -257,6 +272,112 @@
     panTo(t.clientX, t.clientY);
   }, { passive: true });
   window.addEventListener('touchend', () => { isPanning = false; });
+
+  // ---- 더보기 팝업 ----
+  moreBtn.addEventListener('click', (e) => {
+    e.stopPropagation();
+    document.body.classList.toggle('moreOpen');
+  });
+  document.addEventListener('click', (e) => {
+    if (document.body.classList.contains('moreOpen') &&
+        !e.target.closest('#moreMenu') && !e.target.closest('#moreBtn')) {
+      document.body.classList.remove('moreOpen');
+    }
+  });
+
+  // ---- 북마크 (이 브라우저에만 저장됨) ----
+  const BOOKMARK_KEY = `ebook_bookmarks_${bookKey}`;
+  let bookmarks = new Set();
+  try { bookmarks = new Set(JSON.parse(localStorage.getItem(BOOKMARK_KEY) || '[]')); } catch (e) {}
+
+  function saveBookmarks() {
+    try { localStorage.setItem(BOOKMARK_KEY, JSON.stringify([...bookmarks])); } catch (e) {}
+  }
+  function updateBookmarkBtn(currentPage) {
+    bookmarkBtn.classList.toggle('active', bookmarks.has(currentPage));
+  }
+  bookmarkBtn.addEventListener('click', () => {
+    const page = pageFlip.getCurrentPageIndex() + 1;
+    if (bookmarks.has(page)) bookmarks.delete(page);
+    else bookmarks.add(page);
+    saveBookmarks();
+    updateBookmarkBtn(page);
+    if (thumbItems[page - 1]) thumbItems[page - 1].classList.toggle('bookmarked', bookmarks.has(page));
+  });
+  thumbItems.forEach((el, i) => { if (bookmarks.has(i + 1)) el.classList.add('bookmarked'); });
+
+  // ---- 소리 (페이지 넘길 때 효과음, 외부 음원 없이 합성) ----
+  const SOUND_KEY = `ebook_sound_${bookKey}`;
+  let soundOn = localStorage.getItem(SOUND_KEY) === 'on';
+  let audioCtx = null;
+
+  function ensureAudioCtx() {
+    if (!audioCtx) {
+      const Ctx = window.AudioContext || window.webkitAudioContext;
+      if (Ctx) audioCtx = new Ctx();
+    }
+    return audioCtx;
+  }
+
+  function playFlipSound() {
+    if (!soundOn) return;
+    const ctx = ensureAudioCtx();
+    if (!ctx) return;
+    try {
+      const now = ctx.currentTime;
+      const dur = 0.18;
+      const bufferSize = Math.floor(ctx.sampleRate * dur);
+      const buffer = ctx.createBuffer(1, bufferSize, ctx.sampleRate);
+      const data = buffer.getChannelData(0);
+      for (let i = 0; i < bufferSize; i++) {
+        data[i] = (Math.random() * 2 - 1) * (1 - i / bufferSize);
+      }
+      const noise = ctx.createBufferSource();
+      noise.buffer = buffer;
+      const filter = ctx.createBiquadFilter();
+      filter.type = 'bandpass';
+      filter.frequency.setValueAtTime(1800, now);
+      filter.frequency.exponentialRampToValueAtTime(500, now + dur);
+      const gain = ctx.createGain();
+      gain.gain.setValueAtTime(0.22, now);
+      gain.gain.exponentialRampToValueAtTime(0.001, now + dur);
+      noise.connect(filter).connect(gain).connect(ctx.destination);
+      noise.start(now);
+      noise.stop(now + dur);
+    } catch (e) {}
+  }
+
+  function updateSoundBtn() { soundBtn.classList.toggle('active', soundOn); }
+  soundBtn.addEventListener('click', () => {
+    soundOn = !soundOn;
+    try { localStorage.setItem(SOUND_KEY, soundOn ? 'on' : 'off'); } catch (e) {}
+    updateSoundBtn();
+    if (soundOn) { ensureAudioCtx(); playFlipSound(); }
+  });
+  updateSoundBtn();
+
+  // ---- 자동 넘김 ----
+  let autoplayTimer = null;
+  function stopAutoplay() {
+    if (autoplayTimer) {
+      clearInterval(autoplayTimer);
+      autoplayTimer = null;
+    }
+    autoplayBtn.classList.remove('active');
+  }
+  function startAutoplay() {
+    autoplayTimer = setInterval(() => {
+      const idx = pageFlip.getCurrentPageIndex();
+      if (idx >= pagesConfig.total - 1) pageFlip.turnToPage(0);
+      else pageFlip.flipNext();
+    }, 3500);
+    autoplayBtn.classList.add('active');
+  }
+  autoplayBtn.addEventListener('click', () => {
+    if (autoplayTimer) stopAutoplay();
+    else startAutoplay();
+  });
+  dragLayer.addEventListener('mousedown', stopAutoplay);
 
   // ---- 전체화면 ----
   fsBtn.addEventListener('click', () => {

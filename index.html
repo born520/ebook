@@ -4,7 +4,7 @@
 <meta charset="UTF-8" />
 <title>e-book 데모 (이미지 플립북)</title>
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
-<link rel="stylesheet" href="viewer.css?v=7" />
+<link rel="stylesheet" href="viewer.css?v=8" />
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/page-flip@2.0.7/src/Style/stPageFlip.css" />
 <script src="https://cdn.jsdelivr.net/npm/page-flip@2.0.7/dist/js/page-flip.browser.js"></script>
 </head>
@@ -31,6 +31,13 @@
       <svg viewBox="0 0 24 24" fill="currentColor"><circle cx="4.5" cy="6" r="1.4"/><circle cx="4.5" cy="12" r="1.4"/><circle cx="4.5" cy="18" r="1.4"/><rect x="8.5" y="5" width="12" height="2" rx="1"/><rect x="8.5" y="11" width="12" height="2" rx="1"/><rect x="8.5" y="17" width="12" height="2" rx="1"/></svg>
     </button>
     <span class="toolDivider"></span>
+    <button id="firstBtn" class="toolIcon" aria-label="첫 페이지">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="6" y1="5" x2="6" y2="19"/><path d="M18 5 L9 12 L18 19"/></svg>
+    </button>
+    <button id="lastBtn" class="toolIcon" aria-label="마지막 페이지">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="5" x2="18" y2="19"/><path d="M6 5 L15 12 L6 19"/></svg>
+    </button>
+    <span class="toolDivider"></span>
     <button id="zoomOutBtn" class="toolIcon" aria-label="축소">
       <svg viewBox="0 0 24 24"><circle cx="10.5" cy="10.5" r="6.5" fill="none" stroke="currentColor" stroke-width="2"/><line x1="8" y1="10.5" x2="13" y2="10.5" stroke="currentColor" stroke-width="2" stroke-linecap="round"/><line x1="15.5" y1="15.5" x2="20" y2="20" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
     </button>
@@ -38,9 +45,24 @@
       <svg viewBox="0 0 24 24"><circle cx="10.5" cy="10.5" r="6.5" fill="none" stroke="currentColor" stroke-width="2"/><line x1="10.5" y1="8" x2="10.5" y2="13" stroke="currentColor" stroke-width="2" stroke-linecap="round"/><line x1="8" y1="10.5" x2="13" y2="10.5" stroke="currentColor" stroke-width="2" stroke-linecap="round"/><line x1="15.5" y1="15.5" x2="20" y2="20" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
     </button>
     <span class="toolDivider"></span>
-    <button id="fsBtn" class="toolIcon" aria-label="전체화면">
-      <svg viewBox="0 0 24 24"><path d="M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+    <button id="moreBtn" class="toolIcon" aria-label="더보기">
+      <svg viewBox="0 0 24 24" fill="currentColor"><circle cx="5" cy="12" r="2"/><circle cx="12" cy="12" r="2"/><circle cx="19" cy="12" r="2"/></svg>
     </button>
+
+    <div id="moreMenu">
+      <button id="bookmarkBtn" class="toolIcon" aria-label="북마크">
+        <svg viewBox="0 0 24 24"><path d="M6 3 H18 V21 L12 16 L6 21 Z" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/></svg>
+      </button>
+      <button id="soundBtn" class="toolIcon" aria-label="소리">
+        <svg viewBox="0 0 24 24" fill="currentColor"><path d="M4 9 H8 L13 4 V20 L8 15 H4 Z"/><path d="M16 8 a6 6 0 0 1 0 8" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/><path d="M19 5 a10 10 0 0 1 0 14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+      </button>
+      <button id="autoplayBtn" class="toolIcon" aria-label="자동 넘김">
+        <svg viewBox="0 0 24 24" fill="currentColor"><path d="M8 5 L19 12 L8 19 Z"/></svg>
+      </button>
+      <button id="fsBtn" class="toolIcon" aria-label="전체화면">
+        <svg viewBox="0 0 24 24"><path d="M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+      </button>
+    </div>
   </nav>
 
   <div id="tocOverlay" class="scrim"></div>
@@ -61,6 +83,6 @@
     <div id="thumbGrid"></div>
   </aside>
 
-  <script src="viewer.js?v=12"></script>
+  <script src="viewer.js?v=13"></script>
 </body>
 </html>
