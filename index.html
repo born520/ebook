@@ -4,30 +4,45 @@
 <meta charset="UTF-8" />
 <title>e-book 데모 (이미지 플립북)</title>
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
-<link rel="stylesheet" href="viewer.css?v=2" />
+<link rel="stylesheet" href="viewer.css?v=3" />
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/page-flip@2.0.7/src/Style/stPageFlip.css" />
 <script src="https://cdn.jsdelivr.net/npm/page-flip@2.0.7/dist/js/page-flip.browser.js"></script>
 </head>
 <body>
 
-  <header id="topbar">
-    <button id="tocBtn" class="iconBtn" aria-label="목차">☰ 목차</button>
-    <div id="pageIndicator">- / -</div>
-    <div id="zoomControls">
-      <button id="zoomOutBtn" class="iconBtn" aria-label="축소">－</button>
-      <span id="zoomLevel">100%</span>
-      <button id="zoomInBtn" class="iconBtn" aria-label="확대">＋</button>
-    </div>
-    <button id="fsBtn" class="iconBtn" aria-label="전체화면">⤢</button>
-  </header>
-
   <main id="stage">
-    <button id="prevBtn" class="navBtn navBtnLeft" aria-label="이전 페이지">‹</button>
+    <button id="prevBtn" class="navArrow navArrowLeft" aria-label="이전 페이지">
+      <svg viewBox="0 0 24 24"><path d="M15 4 L7 12 L15 20" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+    </button>
     <div id="book"></div>
-    <button id="nextBtn" class="navBtn navBtnRight" aria-label="다음 페이지">›</button>
+    <button id="nextBtn" class="navArrow navArrowRight" aria-label="다음 페이지">
+      <svg viewBox="0 0 24 24"><path d="M9 4 L17 12 L9 20" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+    </button>
   </main>
 
-  <div id="tocOverlay"></div>
+  <div id="pageIndicator" class="pill">- / -</div>
+
+  <nav id="bottomBar">
+    <button id="thumbBtn" class="toolIcon" aria-label="썸네일">
+      <svg viewBox="0 0 24 24" fill="currentColor"><rect x="3" y="3" width="8" height="8" rx="1.5"/><rect x="13" y="3" width="8" height="8" rx="1.5"/><rect x="3" y="13" width="8" height="8" rx="1.5"/><rect x="13" y="13" width="8" height="8" rx="1.5"/></svg>
+    </button>
+    <button id="tocBtn" class="toolIcon" aria-label="목차">
+      <svg viewBox="0 0 24 24" fill="currentColor"><circle cx="4.5" cy="6" r="1.4"/><circle cx="4.5" cy="12" r="1.4"/><circle cx="4.5" cy="18" r="1.4"/><rect x="8.5" y="5" width="12" height="2" rx="1"/><rect x="8.5" y="11" width="12" height="2" rx="1"/><rect x="8.5" y="17" width="12" height="2" rx="1"/></svg>
+    </button>
+    <span class="toolDivider"></span>
+    <button id="zoomOutBtn" class="toolIcon" aria-label="축소">
+      <svg viewBox="0 0 24 24"><circle cx="10.5" cy="10.5" r="6.5" fill="none" stroke="currentColor" stroke-width="2"/><line x1="8" y1="10.5" x2="13" y2="10.5" stroke="currentColor" stroke-width="2" stroke-linecap="round"/><line x1="15.5" y1="15.5" x2="20" y2="20" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+    </button>
+    <button id="zoomInBtn" class="toolIcon" aria-label="확대">
+      <svg viewBox="0 0 24 24"><circle cx="10.5" cy="10.5" r="6.5" fill="none" stroke="currentColor" stroke-width="2"/><line x1="10.5" y1="8" x2="10.5" y2="13" stroke="currentColor" stroke-width="2" stroke-linecap="round"/><line x1="8" y1="10.5" x2="13" y2="10.5" stroke="currentColor" stroke-width="2" stroke-linecap="round"/><line x1="15.5" y1="15.5" x2="20" y2="20" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+    </button>
+    <span class="toolDivider"></span>
+    <button id="fsBtn" class="toolIcon" aria-label="전체화면">
+      <svg viewBox="0 0 24 24"><path d="M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+    </button>
+  </nav>
+
+  <div id="tocOverlay" class="scrim"></div>
   <aside id="tocPanel">
     <div id="tocPanelHeader">
       <span>목차</span>
@@ -36,6 +51,15 @@
     <ul id="tocList"></ul>
   </aside>
 
-  <script src="viewer.js?v=8"></script>
+  <div id="thumbOverlay" class="scrim"></div>
+  <aside id="thumbPanel">
+    <div id="thumbPanelHeader">
+      <span>페이지</span>
+      <button id="thumbCloseBtn" class="iconBtn" aria-label="닫기">✕</button>
+    </div>
+    <div id="thumbGrid"></div>
+  </aside>
+
+  <script src="viewer.js?v=11"></script>
 </body>
 </html>

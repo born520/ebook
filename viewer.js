@@ -10,7 +10,10 @@
   const fsBtn = document.getElementById('fsBtn');
   const zoomInBtn = document.getElementById('zoomInBtn');
   const zoomOutBtn = document.getElementById('zoomOutBtn');
-  const zoomLevelEl = document.getElementById('zoomLevel');
+  const thumbBtn = document.getElementById('thumbBtn');
+  const thumbCloseBtn = document.getElementById('thumbCloseBtn');
+  const thumbOverlay = document.getElementById('thumbOverlay');
+  const thumbGrid = document.getElementById('thumbGrid');
 
   const params = new URLSearchParams(location.search);
   const book = params.get('book') || 'sme-booklet';
@@ -31,6 +34,34 @@
     urls.push(`${prefix}${base}${i}.${pagesConfig.ext}`);
   }
 
+  // ---- 썸네일 그리드 (책에서 이미 받은 이미지를 재사용, 추가 다운로드 없음) ----
+  const thumbItems = [];
+  urls.forEach((url, idx) => {
+    const item = document.createElement('div');
+    item.className = 'thumbItem';
+    const img = document.createElement('img');
+    img.loading = 'lazy';
+    img.src = url;
+    img.alt = String(idx + 1);
+    const num = document.createElement('span');
+    num.className = 'thumbNum';
+    num.textContent = idx + 1;
+    item.appendChild(img);
+    item.appendChild(num);
+    item.addEventListener('click', () => {
+      gotoPage(idx + 1);
+      closeThumb();
+    });
+    thumbGrid.appendChild(item);
+    thumbItems.push(item);
+  });
+
+  function openThumb() { document.body.classList.add('thumbOpen'); }
+  function closeThumb() { document.body.classList.remove('thumbOpen'); }
+  thumbBtn.addEventListener('click', openThumb);
+  thumbCloseBtn.addEventListener('click', closeThumb);
+  thumbOverlay.addEventListener('click', closeThumb);
+
   // 페이지 비율 (A4 기준, 책마다 거의 동일)
   const PAGE_RATIO = 906 / 1280;
 
@@ -43,8 +74,9 @@
   function computeSize(spread) {
     const stage = document.getElementById('stage');
     // 모바일은 내비 버튼이 이미지 위에 떠있는 형태라 여백을 최소화해서 꽉 차게 표시
-    const marginW = isMobile ? 8 : 120;
-    const marginH = isMobile ? 8 : 20;
+    // 세로 여백은 하단 플로팅 툴바/페이지 표시 pill과 겹치지 않도록 확보
+    const marginW = isMobile ? 8 : 100;
+    const marginH = isMobile ? 100 : 110;
     const availW = (stage.clientWidth || 960) - marginW;
     const availH = (stage.clientHeight || 720) - marginH;
     const widthFactor = spread ? 2 : 1;
@@ -104,6 +136,7 @@
     const idx = pageFlip.getCurrentPageIndex();
     pageIndicator.textContent = `${idx + 1} / ${pagesConfig.total}`;
     highlightActiveToc(idx + 1);
+    thumbItems.forEach((el, i) => el.classList.toggle('active', i === idx));
   }
 
   prevBtn.addEventListener('click', () => pageFlip.flipPrev());
@@ -172,7 +205,6 @@
 
   function applyZoom() {
     bookEl.style.transform = `scale(${zoomLevel})`;
-    zoomLevelEl.textContent = `${Math.round(zoomLevel * 100)}%`;
     zoomInBtn.disabled = zoomLevel >= ZOOM_MAX;
     zoomOutBtn.disabled = zoomLevel <= ZOOM_MIN;
   }
