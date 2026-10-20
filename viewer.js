@@ -37,8 +37,11 @@
   // 한 페이지 기준 크기 계산. spread=true면 두 페이지가 나란히 들어가도록 폭을 맞춤
   function computeSize(spread) {
     const stage = document.getElementById('stage');
-    const availW = (stage.clientWidth || 960) - 120;
-    const availH = (stage.clientHeight || 720) - 20;
+    // 모바일은 내비 버튼이 이미지 위에 떠있는 형태라 여백을 최소화해서 꽉 차게 표시
+    const marginW = isMobile ? 8 : 120;
+    const marginH = isMobile ? 8 : 20;
+    const availW = (stage.clientWidth || 960) - marginW;
+    const availH = (stage.clientHeight || 720) - marginH;
     const widthFactor = spread ? 2 : 1;
     let h = Math.max(availH, 200);
     let w = h * PAGE_RATIO;
