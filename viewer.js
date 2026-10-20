@@ -34,6 +34,11 @@
   // 페이지 비율 (A4 기준, 책마다 거의 동일)
   const PAGE_RATIO = 906 / 1280;
 
+  // 확대 범위 (캔버스 해상도 계산에도 쓰이므로 최상단에 선언)
+  const ZOOM_MIN = 1;
+  const ZOOM_MAX = 2.5;
+  const ZOOM_STEP = 0.25;
+
   // 한 페이지 기준 크기 계산. spread=true면 두 페이지가 나란히 들어가도록 폭을 맞춤
   function computeSize(spread) {
     const stage = document.getElementById('stage');
@@ -59,6 +64,9 @@
     const spread = !isMobile; // 데스크톱/태블릿은 두 페이지 보기, 모바일은 한 페이지
     const size = computeSize(spread);
     const dpr = Math.min(window.devicePixelRatio || 1, 2);
+    // 확대 버튼으로 최대 ZOOM_MAX배까지 커질 수 있으므로, 캔버스 자체를
+    // 그만큼 더 높은 해상도로 그려둬야 확대해도 흐려지지 않는다.
+    const renderScale = dpr * ZOOM_MAX;
 
     // bookEl: 화면에 보이는 실제 크기(클리핑 박스) - 스프레드면 폭 2배
     const boxW = spread ? size.w * 2 : size.w;
@@ -67,18 +75,18 @@
     bookEl.style.overflow = 'hidden';
     bookEl.style.position = 'relative';
 
-    // inner: dpr배 해상도로 그린 뒤 CSS transform으로 축소 (고해상도 렌더 + 선명한 축소)
+    // inner: renderScale배 해상도로 그린 뒤 CSS transform으로 축소 (고해상도 렌더 + 선명한 축소)
     const inner = document.createElement('div');
     inner.style.position = 'absolute';
     inner.style.top = '0';
     inner.style.left = '0';
     inner.style.transformOrigin = 'top left';
-    inner.style.transform = `scale(${1 / dpr})`;
+    inner.style.transform = `scale(${1 / renderScale})`;
     bookEl.appendChild(inner);
 
     pageFlip = new St.PageFlip(inner, {
-      width: Math.round(size.w * dpr),
-      height: Math.round(size.h * dpr),
+      width: Math.round(size.w * renderScale),
+      height: Math.round(size.h * renderScale),
       size: 'fixed',
       showCover: false,
       mobileScrollSupport: true,
@@ -160,9 +168,6 @@
   tocOverlay.addEventListener('click', closeToc);
 
   // ---- 확대/축소 ----
-  const ZOOM_MIN = 1;
-  const ZOOM_MAX = 2.5;
-  const ZOOM_STEP = 0.25;
   let zoomLevel = 1;
 
   function applyZoom() {
