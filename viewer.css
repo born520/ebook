@@ -258,11 +258,17 @@ body.thumbOpen #thumbPanel {
   overflow-y: auto;
   padding: 16px;
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(110px, 1fr));
+  /* 행 높이를 aspect-ratio 기반 auto 계산에 맡기면 일부 브라우저에서
+     행이 겹쳐버려서, 칼럼 폭과 행 높이를 둘 다 고정값으로 명시 */
+  grid-template-columns: repeat(auto-fill, 112px);
+  grid-auto-rows: 158px;
+  justify-content: center;
   gap: 12px;
   align-content: start;
 }
 .thumbItem {
+  position: relative;
+  aspect-ratio: 906 / 1280;
   cursor: pointer;
   border-radius: 6px;
   overflow: hidden;
@@ -274,14 +280,18 @@ body.thumbOpen #thumbPanel {
 .thumbItem img {
   display: block;
   width: 100%;
-  aspect-ratio: 906 / 1280;
+  height: 100%;
   object-fit: cover;
 }
 .thumbItem .thumbNum {
-  display: block;
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
   text-align: center;
   font-size: 11px;
-  color: #999;
+  color: #eee;
+  background: rgba(0,0,0,0.55);
   padding: 3px 0;
 }
 
@@ -289,5 +299,5 @@ body.thumbOpen #thumbPanel {
   #tocPanel { width: 80%; left: -100%; }
   #thumbPanel { width: 94vw; height: 80vh; }
   .navArrow { width: 32px; height: 32px; }
-  #thumbGrid { grid-template-columns: repeat(auto-fill, minmax(84px, 1fr)); }
+  #thumbGrid { grid-template-columns: repeat(auto-fill, 84px); }
 }
