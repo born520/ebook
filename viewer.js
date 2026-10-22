@@ -137,10 +137,31 @@
       usePortrait: !spread,
       maxShadowOpacity: 0.5
     });
+    // 현재 페이지가 단독으로 보이는 페이지(표지=1페이지, 짝이 없는 마지막 페이지)인지
+    // 직접 계산해서 클리핑 박스 폭을 맞춘다. (캔버스 실측 폭을 되읽어 맞추면
+    // 라이브러리의 자체 반응형 판단과 서로 영향을 주고받아 불안정해짐)
+    function isSingleIndex(idx) {
+      if (!spread) return true; // 모바일은 항상 한 페이지
+      if (idx === 0) return true; // 표지
+      if (idx === pagesConfig.total - 1 && pagesConfig.total % 2 === 0) return true; // 마지막 홀로 남는 페이지
+      return false;
+    }
+    function syncBookWidth() {
+      const idx = pageFlip.getCurrentPageIndex();
+      const single = isSingleIndex(idx);
+      bookEl.style.width = (single ? size.w : size.w * 2) + 'px';
+      // 스프레드 모드에서는 단독 페이지(표지/뒤표지)도 캔버스 내부적으로는
+      // 2페이지 폭 그대로 그려지고, 실제 내용은 항상 오른쪽 절반에 위치한다.
+      // 왼쪽 빈 절반이 보이지 않도록 보이는 구간을 오른쪽 절반으로 밀어준다.
+      inner.style.left = (spread && single ? -size.w : 0) + 'px';
+    }
+
     pageFlip.loadFromImages(urls);
     pageFlip.on('flip', updateIndicator);
     pageFlip.on('init', updateIndicator);
     pageFlip.on('flip', playFlipSound);
+    pageFlip.on('flip', syncBookWidth);
+    pageFlip.on('init', syncBookWidth);
   }
 
   buildBook();
@@ -321,31 +342,69 @@
     return audioCtx;
   }
 
+  // 종이가 팔랑이는 결(flutter)과 끝에 사뿐히 내려앉는 톡 소리를 합쳐서
+  // 단순 '쉭' 소리보다 실제 책장 넘기는 느낌에 가깝게 만든다. 매번 살짝
+  // 다르게 랜덤화해서 기계적으로 반복되는 느낌도 줄인다.
   function playFlipSound() {
     if (!soundOn) return;
     const ctx = ensureAudioCtx();
     if (!ctx) return;
     try {
       const now = ctx.currentTime;
-      const dur = 0.18;
+      const dur = 0.2 + Math.random() * 0.08;
+
+      // 1) 종이 팔랑이는 결 (노이즈 + 불규칙한 떨림으로 진폭 변조)
       const bufferSize = Math.floor(ctx.sampleRate * dur);
       const buffer = ctx.createBuffer(1, bufferSize, ctx.sampleRate);
       const data = buffer.getChannelData(0);
+      const flutterHz = 26 + Math.random() * 10;
       for (let i = 0; i < bufferSize; i++) {
-        data[i] = (Math.random() * 2 - 1) * (1 - i / bufferSize);
+        const t = i / bufferSize;
+        const flutter = 0.55 + 0.45 * Math.abs(Math.sin(t * flutterHz + Math.sin(t * 7) * 2));
+        data[i] = (Math.random() * 2 - 1) * Math.pow(1 - t, 1.3) * flutter;
       }
       const noise = ctx.createBufferSource();
       noise.buffer = buffer;
-      const filter = ctx.createBiquadFilter();
-      filter.type = 'bandpass';
-      filter.frequency.setValueAtTime(1800, now);
-      filter.frequency.exponentialRampToValueAtTime(500, now + dur);
+
+      const highpass = ctx.createBiquadFilter();
+      highpass.type = 'highpass';
+      highpass.frequency.setValueAtTime(900, now);
+
+      const bandpass = ctx.createBiquadFilter();
+      bandpass.type = 'bandpass';
+      bandpass.Q.value = 0.6;
+      bandpass.frequency.setValueAtTime(2600, now);
+      bandpass.frequency.exponentialRampToValueAtTime(700, now + dur);
+
       const gain = ctx.createGain();
-      gain.gain.setValueAtTime(0.22, now);
+      gain.gain.setValueAtTime(0.0001, now);
+      gain.gain.exponentialRampToValueAtTime(0.28, now + 0.012);
       gain.gain.exponentialRampToValueAtTime(0.001, now + dur);
-      noise.connect(filter).connect(gain).connect(ctx.destination);
+
+      noise.connect(highpass).connect(bandpass).connect(gain).connect(ctx.destination);
       noise.start(now);
       noise.stop(now + dur);
+
+      // 2) 페이지가 손에서 떨어지며 '톡' 하고 정착하는 짧은 꼬리음
+      const tickAt = now + dur * 0.82;
+      const tickDur = 0.03;
+      const tickSize = Math.floor(ctx.sampleRate * tickDur);
+      const tickBuffer = ctx.createBuffer(1, tickSize, ctx.sampleRate);
+      const tickData = tickBuffer.getChannelData(0);
+      for (let i = 0; i < tickSize; i++) {
+        tickData[i] = (Math.random() * 2 - 1) * (1 - i / tickSize);
+      }
+      const tick = ctx.createBufferSource();
+      tick.buffer = tickBuffer;
+      const tickFilter = ctx.createBiquadFilter();
+      tickFilter.type = 'highpass';
+      tickFilter.frequency.value = 4000;
+      const tickGain = ctx.createGain();
+      tickGain.gain.setValueAtTime(0.18, tickAt);
+      tickGain.gain.exponentialRampToValueAtTime(0.001, tickAt + tickDur);
+      tick.connect(tickFilter).connect(tickGain).connect(ctx.destination);
+      tick.start(tickAt);
+      tick.stop(tickAt + tickDur);
     } catch (e) {}
   }
 
