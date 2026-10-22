@@ -130,7 +130,9 @@
       width: Math.round(size.w * renderScale),
       height: Math.round(size.h * renderScale),
       size: 'fixed',
-      showCover: false,
+      // 1페이지(표지)는 단독으로 보여주고, 그 다음부터 2-3, 4-5... 식으로 짝을
+      // 지어야 업체 소개(짝수 시작)가 스프레드 하나에 온전히 들어온다.
+      showCover: true,
       mobileScrollSupport: true,
       usePortrait: !spread,
       maxShadowOpacity: 0.5
