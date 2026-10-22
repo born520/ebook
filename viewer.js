@@ -151,9 +151,11 @@
       const single = isSingleIndex(idx);
       bookEl.style.width = (single ? size.w : size.w * 2) + 'px';
       // 스프레드 모드에서는 단독 페이지(표지/뒤표지)도 캔버스 내부적으로는
-      // 2페이지 폭 그대로 그려지고, 실제 내용은 항상 오른쪽 절반에 위치한다.
-      // 왼쪽 빈 절반이 보이지 않도록 보이는 구간을 오른쪽 절반으로 밀어준다.
-      inner.style.left = (spread && single ? -size.w : 0) + 'px';
+      // 2페이지 폭 그대로 그려진다. 표지(첫 페이지)는 오른쪽 절반에,
+      // 뒤표지(마지막 홀로 남는 페이지)는 왼쪽 절반에 실제 내용이 위치하므로
+      // 보이는 구간을 내용이 있는 쪽으로 밀어줘야 한다.
+      const isLastSingle = idx === pagesConfig.total - 1 && pagesConfig.total % 2 === 0;
+      inner.style.left = (spread && single && !isLastSingle ? -size.w : 0) + 'px';
     }
 
     pageFlip.loadFromImages(urls);
@@ -342,69 +344,74 @@
     return audioCtx;
   }
 
-  // 종이가 팔랑이는 결(flutter)과 끝에 사뿐히 내려앉는 톡 소리를 합쳐서
-  // 단순 '쉭' 소리보다 실제 책장 넘기는 느낌에 가깝게 만든다. 매번 살짝
-  // 다르게 랜덤화해서 기계적으로 반복되는 느낌도 줄인다.
+  // 실제 종이 넘김은 매끄러운 '쉭' 한번이 아니라, 수십 개의 불규칙한
+  // 바스락 알갱이(crinkle grain)가 겹쳐 들리는 질감에 가깝다. 중저역 바탕음
+  // 위에 짧은 노이즈 알갱이를 흩뿌리고, 마지막에 종이가 내려앉는 '톡' 소리
+  // (저음 쿵 + 고음 탁)를 더해 합성한다. 매번 랜덤화해 기계적 반복감을 줄인다.
+  function noiseGrain(ctx, master, startAt, length, peakGain, freqLo, freqHi, attack) {
+    const size = Math.max(1, Math.floor(ctx.sampleRate * length));
+    const buffer = ctx.createBuffer(1, size, ctx.sampleRate);
+    const data = buffer.getChannelData(0);
+    for (let i = 0; i < size; i++) data[i] = Math.random() * 2 - 1;
+    const src = ctx.createBufferSource();
+    src.buffer = buffer;
+    const hp = ctx.createBiquadFilter();
+    hp.type = 'highpass';
+    hp.frequency.value = freqLo;
+    const lp = ctx.createBiquadFilter();
+    lp.type = 'lowpass';
+    lp.frequency.value = freqHi;
+    const g = ctx.createGain();
+    const a = Math.max(0.002, Math.min(attack, length * 0.4));
+    g.gain.setValueAtTime(0.0001, startAt);
+    g.gain.exponentialRampToValueAtTime(peakGain, startAt + a);
+    g.gain.exponentialRampToValueAtTime(0.0001, startAt + length);
+    src.connect(hp).connect(lp).connect(g).connect(master);
+    src.start(startAt);
+    src.stop(startAt + length + 0.01);
+  }
+
   function playFlipSound() {
     if (!soundOn) return;
     const ctx = ensureAudioCtx();
     if (!ctx) return;
     try {
       const now = ctx.currentTime;
-      const dur = 0.2 + Math.random() * 0.08;
+      const dur = 0.34 + Math.random() * 0.1;
 
-      // 1) 종이 팔랑이는 결 (노이즈 + 불규칙한 떨림으로 진폭 변조)
-      const bufferSize = Math.floor(ctx.sampleRate * dur);
-      const buffer = ctx.createBuffer(1, bufferSize, ctx.sampleRate);
-      const data = buffer.getChannelData(0);
-      const flutterHz = 26 + Math.random() * 10;
-      for (let i = 0; i < bufferSize; i++) {
-        const t = i / bufferSize;
-        const flutter = 0.55 + 0.45 * Math.abs(Math.sin(t * flutterHz + Math.sin(t * 7) * 2));
-        data[i] = (Math.random() * 2 - 1) * Math.pow(1 - t, 1.3) * flutter;
+      const master = ctx.createGain();
+      master.gain.value = 1;
+      master.connect(ctx.destination);
+
+      // 1) 페이지가 넘어가는 동안 깔리는 중저역 바탕음 (서서히 커졌다 잦아듦)
+      noiseGrain(ctx, master, now, dur, 0.22, 500, 5000, dur * 0.35);
+
+      // 2) 결을 따라 팔랑이는 불규칙한 바스락 알갱이들
+      const grainCount = 10 + Math.floor(Math.random() * 6);
+      for (let i = 0; i < grainCount; i++) {
+        const tpos = now + dur * (0.05 + 0.75 * (i / grainCount) + (Math.random() - 0.5) * 0.04);
+        const glen = 0.012 + Math.random() * 0.02;
+        const gpeak = 0.1 + Math.random() * 0.16;
+        const loF = 900 + Math.random() * 1200;
+        const hiF = loF + 1200 + Math.random() * 1800;
+        noiseGrain(ctx, master, Math.max(now, tpos), glen, gpeak, loF, hiF, glen * 0.3);
       }
-      const noise = ctx.createBufferSource();
-      noise.buffer = buffer;
 
-      const highpass = ctx.createBiquadFilter();
-      highpass.type = 'highpass';
-      highpass.frequency.setValueAtTime(900, now);
+      // 3) 종이가 내려앉는 순간의 '톡' - 저음 쿵 + 고음 탁을 함께 섞는다
+      const tapAt = now + dur * 0.9;
+      noiseGrain(ctx, master, tapAt, 0.025, 0.2, 3500, 9000, 0.004);
 
-      const bandpass = ctx.createBiquadFilter();
-      bandpass.type = 'bandpass';
-      bandpass.Q.value = 0.6;
-      bandpass.frequency.setValueAtTime(2600, now);
-      bandpass.frequency.exponentialRampToValueAtTime(700, now + dur);
-
-      const gain = ctx.createGain();
-      gain.gain.setValueAtTime(0.0001, now);
-      gain.gain.exponentialRampToValueAtTime(0.28, now + 0.012);
-      gain.gain.exponentialRampToValueAtTime(0.001, now + dur);
-
-      noise.connect(highpass).connect(bandpass).connect(gain).connect(ctx.destination);
-      noise.start(now);
-      noise.stop(now + dur);
-
-      // 2) 페이지가 손에서 떨어지며 '톡' 하고 정착하는 짧은 꼬리음
-      const tickAt = now + dur * 0.82;
-      const tickDur = 0.03;
-      const tickSize = Math.floor(ctx.sampleRate * tickDur);
-      const tickBuffer = ctx.createBuffer(1, tickSize, ctx.sampleRate);
-      const tickData = tickBuffer.getChannelData(0);
-      for (let i = 0; i < tickSize; i++) {
-        tickData[i] = (Math.random() * 2 - 1) * (1 - i / tickSize);
-      }
-      const tick = ctx.createBufferSource();
-      tick.buffer = tickBuffer;
-      const tickFilter = ctx.createBiquadFilter();
-      tickFilter.type = 'highpass';
-      tickFilter.frequency.value = 4000;
-      const tickGain = ctx.createGain();
-      tickGain.gain.setValueAtTime(0.18, tickAt);
-      tickGain.gain.exponentialRampToValueAtTime(0.001, tickAt + tickDur);
-      tick.connect(tickFilter).connect(tickGain).connect(ctx.destination);
-      tick.start(tickAt);
-      tick.stop(tickAt + tickDur);
+      const thump = ctx.createOscillator();
+      thump.type = 'sine';
+      thump.frequency.setValueAtTime(220, tapAt);
+      thump.frequency.exponentialRampToValueAtTime(90, tapAt + 0.08);
+      const thumpGain = ctx.createGain();
+      thumpGain.gain.setValueAtTime(0.0001, tapAt);
+      thumpGain.gain.exponentialRampToValueAtTime(0.12, tapAt + 0.006);
+      thumpGain.gain.exponentialRampToValueAtTime(0.0001, tapAt + 0.09);
+      thump.connect(thumpGain).connect(master);
+      thump.start(tapAt);
+      thump.stop(tapAt + 0.1);
     } catch (e) {}
   }
 
