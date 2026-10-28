@@ -24,6 +24,12 @@
   const soundBtn = document.getElementById('soundBtn');
   const autoplayBtn = document.getElementById('autoplayBtn');
 
+  // 업체소개 페이지 QR코드 클릭 영역용. applyZoom()이 아직 정의되지 않은
+  // 시점에도 안전하게 참조할 수 있도록 여기서 미리 선언해둔다.
+  let qrHotspot = null;
+  let qrMap = {};
+  let spreadMode = true;
+
   const params = new URLSearchParams(location.search);
   const book = params.get('book') || 'sme-booklet';
   const prefix = `books/${book}/`;
@@ -104,6 +110,7 @@
   function buildBook() {
     bookEl.innerHTML = '';
     const spread = !isMobile; // 데스크톱/태블릿은 두 페이지 보기, 모바일은 한 페이지
+    spreadMode = spread;
     const size = computeSize(spread);
     const dpr = Math.min(window.devicePixelRatio || 1, 2);
     // 확대 버튼으로 최대 ZOOM_MAX배까지 커질 수 있으므로, 캔버스 자체를
@@ -164,6 +171,8 @@
     pageFlip.on('flip', playFlipSound);
     pageFlip.on('flip', syncBookWidth);
     pageFlip.on('init', syncBookWidth);
+    pageFlip.on('flip', updateQrHotspot);
+    pageFlip.on('init', updateQrHotspot);
   }
 
   buildBook();
@@ -250,6 +259,7 @@
     zoomInBtn.disabled = zoomLevel >= ZOOM_MAX;
     zoomOutBtn.disabled = zoomLevel <= ZOOM_MIN;
     document.body.classList.toggle('zoomed', zoomLevel > 1);
+    updateQrHotspot();
   }
 
   zoomInBtn.addEventListener('click', () => {
@@ -269,6 +279,7 @@
   function panTo(clientX, clientY) {
     stageEl.scrollLeft = panStart.scrollLeft - (clientX - panStart.x);
     stageEl.scrollTop = panStart.scrollTop - (clientY - panStart.y);
+    updateQrHotspot();
   }
 
   dragLayer.addEventListener('mousedown', (e) => {
@@ -297,6 +308,127 @@
     panTo(t.clientX, t.clientY);
   }, { passive: true });
   window.addEventListener('touchend', () => { isPanning = false; });
+
+  // ---- 핀치 줌 (두 손가락으로 확대/축소하면서 원하는 지점으로 이동) ----
+  // 확대 전(zoomLevel===1)에도 동작해야 하므로 dragLayer(확대 중에만 보임)가
+  // 아니라 항상 존재하는 #stage에 캡처 단계로 건다. 손가락이 1개일 때는
+  // 그대로 흘려보내 기존 페이지 넘기기/패닝 동작과 겹치지 않게 한다.
+  let pinchActive = false;
+  let pinchStartDist = 1;
+  let pinchStartZoom = 1;
+
+  function touchDist(touches) {
+    const dx = touches[0].clientX - touches[1].clientX;
+    const dy = touches[0].clientY - touches[1].clientY;
+    return Math.hypot(dx, dy) || 1;
+  }
+  function touchMid(touches) {
+    return {
+      x: (touches[0].clientX + touches[1].clientX) / 2,
+      y: (touches[0].clientY + touches[1].clientY) / 2
+    };
+  }
+
+  // 핀치 중심점이 화면상 같은 자리에 머물도록, 확대 전/후 bookEl의 실제
+  // 렌더링 좌표를 비교해서 스크롤 위치를 보정한다(핀치한 지점 기준 확대).
+  function setZoomAroundPoint(newZoom, clientX, clientY) {
+    newZoom = Math.min(ZOOM_MAX, Math.max(ZOOM_MIN, newZoom));
+    const before = bookEl.getBoundingClientRect();
+    if (!before.width || !before.height) {
+      zoomLevel = newZoom;
+      applyZoom();
+      return;
+    }
+    const relX = (clientX - before.left) / before.width;
+    const relY = (clientY - before.top) / before.height;
+    zoomLevel = newZoom;
+    applyZoom();
+    const after = bookEl.getBoundingClientRect();
+    stageEl.scrollLeft += (after.left + relX * after.width) - clientX;
+    stageEl.scrollTop += (after.top + relY * after.height) - clientY;
+  }
+
+  stageEl.addEventListener('touchstart', (e) => {
+    if (e.touches.length !== 2) return;
+    stopAutoplay();
+    isPanning = false;
+    pinchActive = true;
+    pinchStartDist = touchDist(e.touches);
+    pinchStartZoom = zoomLevel;
+    bookEl.classList.add('noTransition');
+    e.preventDefault();
+    e.stopPropagation();
+  }, { capture: true, passive: false });
+
+  stageEl.addEventListener('touchmove', (e) => {
+    if (!pinchActive || e.touches.length < 2) return;
+    e.preventDefault();
+    e.stopPropagation();
+    const dist = touchDist(e.touches);
+    const mid = touchMid(e.touches);
+    setZoomAroundPoint(pinchStartZoom * (dist / pinchStartDist), mid.x, mid.y);
+  }, { capture: true, passive: false });
+
+  function endPinch(e) {
+    if (!pinchActive) return;
+    if (e && e.touches && e.touches.length >= 2) return;
+    pinchActive = false;
+    bookEl.classList.remove('noTransition');
+    zoomLevel = +zoomLevel.toFixed(2);
+    applyZoom();
+  }
+  stageEl.addEventListener('touchend', endPinch, { capture: true });
+  stageEl.addEventListener('touchcancel', endPinch, { capture: true });
+
+  // ---- 업체소개 페이지 QR코드 클릭 -> 홈페이지 링크 열기 ----
+  fetch(prefix + 'qrlinks.json')
+    .then((r) => (r.ok ? r.json() : {}))
+    .then((d) => { qrMap = d || {}; updateQrHotspot(); })
+    .catch(() => {});
+
+  qrHotspot = document.createElement('a');
+  qrHotspot.id = 'qrHotspot';
+  qrHotspot.target = '_blank';
+  qrHotspot.rel = 'noopener noreferrer';
+  qrHotspot.addEventListener('click', (e) => e.stopPropagation());
+  document.body.appendChild(qrHotspot);
+
+  // showCover 짝짓기 규칙과 동일하게, 현재 페이지 인덱스(0-based)로부터
+  // 지금 화면에 보이는 페이지 번호(1-based)들을 계산한다.
+  function pagesInCurrentSpread(idx0) {
+    if (!spreadMode) return [idx0 + 1];
+    if (idx0 === 0) return [1];
+    if (idx0 === pagesConfig.total - 1 && pagesConfig.total % 2 === 0) return [pagesConfig.total];
+    const k = Math.floor((idx0 - 1) / 2);
+    return [2 + 2 * k, 3 + 2 * k];
+  }
+
+  function updateQrHotspot() {
+    if (!qrHotspot || !pageFlip) return;
+    const pagesShown = pagesInCurrentSpread(pageFlip.getCurrentPageIndex());
+    const qrPage = pagesShown.find((p) => qrMap[p]);
+    const data = qrPage ? qrMap[qrPage] : null;
+    if (!data) { qrHotspot.style.display = 'none'; return; }
+
+    const rect = bookEl.getBoundingClientRect();
+    const slotWidth = rect.width / pagesShown.length;
+    const slotLeft = rect.left + pagesShown.indexOf(qrPage) * slotWidth;
+
+    // 정확한 QR 픽셀 영역보다 살짝 여유를 둬서 탭하기 쉽게 한다.
+    const padX = data.w * 0.15;
+    const padY = data.h * 0.15;
+    const x = Math.max(0, data.x - padX);
+    const y = Math.max(0, data.y - padY);
+    const w = Math.min(1 - x, data.w + padX * 2);
+    const h = Math.min(1 - y, data.h + padY * 2);
+
+    qrHotspot.style.display = 'block';
+    qrHotspot.style.left = (slotLeft + x * slotWidth) + 'px';
+    qrHotspot.style.top = (rect.top + y * rect.height) + 'px';
+    qrHotspot.style.width = (w * slotWidth) + 'px';
+    qrHotspot.style.height = (h * rect.height) + 'px';
+    qrHotspot.href = data.url;
+  }
 
   // ---- 더보기 팝업 ----
   moreBtn.addEventListener('click', (e) => {
