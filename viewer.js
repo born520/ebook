@@ -328,7 +328,7 @@
 
   // ---- 핀치 줌 (두 손가락으로 확대/축소하면서 원하는 지점으로 이동) ----
   // 확대 전(zoomLevel===1)에도 동작해야 하므로 dragLayer(확대 중에만 보임)가
-  // 아니라 항상 존재하는 #stage에 캡처 단계로 건다. 손가락이 1개일 때는
+  // 아니라 항상 존재하는 window에 캡처 단계로 건다. 손가락이 1개일 때는
   // 그대로 흘려보내 기존 페이지 넘기기/패닝 동작과 겹치지 않게 한다.
   let pinchActive = false;
   let pinchStartDist = 1;
@@ -365,7 +365,21 @@
     stageEl.scrollTop += (after.top + relY * after.height) - clientY;
   }
 
-  stageEl.addEventListener('touchstart', (e) => {
+  // StPageFlip은 손가락을 처음 댄 요소(distElement) 기준으로 터치를 계속
+  // 추적한다. 핀치를 시작할 때 첫 손가락은 확대되기 전(dragLayer가 아직 안
+  // 보이는 상태)에 닿아서 그 요소로 잡혀버리는데, 핀치가 끝난 뒤 그
+  // 손가락을 그대로 움직여 패닝해도 터치의 target은 중간에 안 바뀌므로
+  // 계속 StPageFlip(window의 전역 touchmove/touchend 리스너)으로 새어
+  // 들어가 "드래그해서 페이지 넘기기"로 오인된다 - 확대해서 이동하다가
+  // 페이지가 넘어가는 원인. 그래서 핀치/확대 관련 리스너를 전부 stageEl이
+  // 아니라 window에 캡처 단계로 걸어서, StPageFlip의 window 리스너보다
+  // 먼저 가로채 dragLayer가 처리하는 것만 빼고 나머지는 차단한다.
+  function isStrayTouch(e) {
+    return (pinchActive || document.body.classList.contains('zoomed')) &&
+      e.target !== dragLayer && !dragLayer.contains(e.target);
+  }
+
+  window.addEventListener('touchstart', (e) => {
     if (e.touches.length !== 2) return;
     stopAutoplay();
     isPanning = false;
@@ -377,13 +391,16 @@
     e.stopPropagation();
   }, { capture: true, passive: false });
 
-  stageEl.addEventListener('touchmove', (e) => {
-    if (!pinchActive || e.touches.length < 2) return;
-    e.preventDefault();
-    e.stopPropagation();
-    const dist = touchDist(e.touches);
-    const mid = touchMid(e.touches);
-    setZoomAroundPoint(pinchStartZoom * (dist / pinchStartDist), mid.x, mid.y);
+  window.addEventListener('touchmove', (e) => {
+    if (pinchActive && e.touches.length >= 2) {
+      e.preventDefault();
+      e.stopPropagation();
+      const dist = touchDist(e.touches);
+      const mid = touchMid(e.touches);
+      setZoomAroundPoint(pinchStartZoom * (dist / pinchStartDist), mid.x, mid.y);
+      return;
+    }
+    if (isStrayTouch(e)) e.stopPropagation();
   }, { capture: true, passive: false });
 
   function endPinch(e) {
@@ -394,8 +411,12 @@
     zoomLevel = +zoomLevel.toFixed(2);
     applyZoom();
   }
-  stageEl.addEventListener('touchend', endPinch, { capture: true });
-  stageEl.addEventListener('touchcancel', endPinch, { capture: true });
+  function handleTouchEnd(e) {
+    if (isStrayTouch(e)) e.stopPropagation();
+    endPinch(e);
+  }
+  window.addEventListener('touchend', handleTouchEnd, { capture: true });
+  window.addEventListener('touchcancel', handleTouchEnd, { capture: true });
 
   // ---- 업체소개 페이지 QR코드 클릭 -> 홈페이지 링크 열기 ----
   fetch(prefix + 'qrlinks.json', { cache: 'no-cache' })
