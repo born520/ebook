@@ -36,8 +36,8 @@
   const bookKey = book || 'default';
 
   const [pagesConfig, toc] = await Promise.all([
-    fetch(prefix + 'pages.json').then(r => r.json()),
-    fetch(prefix + 'toc.json').then(r => r.json())
+    fetch(prefix + 'pages.json', { cache: 'no-cache' }).then(r => r.json()),
+    fetch(prefix + 'toc.json', { cache: 'no-cache' }).then(r => r.json())
   ]);
 
   const isMobile = window.innerWidth < 768;
@@ -387,7 +387,7 @@
   stageEl.addEventListener('touchcancel', endPinch, { capture: true });
 
   // ---- 업체소개 페이지 QR코드 클릭 -> 홈페이지 링크 열기 ----
-  fetch(prefix + 'qrlinks.json')
+  fetch(prefix + 'qrlinks.json', { cache: 'no-cache' })
     .then((r) => (r.ok ? r.json() : {}))
     .then((d) => { qrMap = d || {}; updateQrHotspot(); })
     .catch(() => {});
