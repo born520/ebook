@@ -21,14 +21,24 @@ body {
   position: absolute;
   top: 0; left: 0; right: 0; bottom: 0;
   display: flex;
-  align-items: center;
-  justify-content: center;
   overflow: auto;
 }
 
+/* #stage에서 align-items/justify-content:center 대신 #book에 margin:auto를
+   쓴다. 확대해서 책이 stage보다 커지면(overflow) center 정렬은 넘치는 영역의
+   절반(한쪽 방향)만 스크롤 가능 영역으로 잡는 크로미움 고질적인 버그가 있어,
+   확대 후 가장자리로 이동하면 그 이상 못 가는 현상이 생긴다. margin:auto는
+   공간이 남을 때는 똑같이 중앙 정렬하면서, 넘칠 때는 0으로 줄어들어 전체
+   영역이 정상적으로 스크롤되게 해준다. */
 #book {
   position: relative;
-  transform-origin: center center;
+  margin: auto;
+  /* center 기준으로 scale()하면 크로미움이 늘어난 영역 중 '뒤로' 넘치는
+     절반을 스크롤 가능 영역에 잡지 못해 그쪽 가장자리로 못 가는 문제가
+     있다. top left 기준으로 당겨서, 확대된 영역이 전부 스크롤 가능한
+     '앞쪽' 방향으로만 넘치게 한다. 어느 지점을 중심으로 확대된 것처럼
+     보이게 하는 건 JS(setZoomAroundPoint)가 스크롤 위치로 보정한다. */
+  transform-origin: top left;
   transition: transform 0.2s ease;
   flex-shrink: 0;
   box-shadow:

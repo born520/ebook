@@ -262,13 +262,19 @@
     updateQrHotspot();
   }
 
+  // 버튼 확대/축소도 핀치와 동일하게 "현재 화면 중앙" 기준으로 확대해서,
+  // 가장자리를 보고 있다가 눌러도 보던 위치에서 더/덜 확대되게 한다.
+  function stageCenter() {
+    const r = stageEl.getBoundingClientRect();
+    return { x: r.left + r.width / 2, y: r.top + r.height / 2 };
+  }
   zoomInBtn.addEventListener('click', () => {
-    zoomLevel = Math.min(ZOOM_MAX, +(zoomLevel + ZOOM_STEP).toFixed(2));
-    applyZoom();
+    const c = stageCenter();
+    setZoomAroundPoint(zoomLevel + ZOOM_STEP, c.x, c.y);
   });
   zoomOutBtn.addEventListener('click', () => {
-    zoomLevel = Math.max(ZOOM_MIN, +(zoomLevel - ZOOM_STEP).toFixed(2));
-    applyZoom();
+    const c = stageCenter();
+    setZoomAroundPoint(zoomLevel - ZOOM_STEP, c.x, c.y);
   });
   applyZoom();
 
