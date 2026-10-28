@@ -107,6 +107,38 @@
 
   let pageFlip = null;
 
+  // 확대 중에는 빠른 스와이프로 직접 넘기는 flipNext/flipPrev/flip을
+  // 막아둔다. (userMove/userStop까지 감싸면 showCover 모드의 표지 전환
+  // 애니메이션 내부 로직이 깨지는 부작용이 있어 이 셋만 감싼다 - 드래그로
+  // 서서히 넘기다 손을 떼서 완료되는 경로는 아래 enforceNoFlipWhileZoomed로
+  // 별도로 막는다. TOC/썸네일로 직접 이동할 때는 gotoPage()가 먼저
+  // 확대를 풀고 호출하므로 영향 없다.)
+  function guardFlipWhileZoomed(pf) {
+    ['flipNext', 'flipPrev', 'flip'].forEach((name) => {
+      const orig = pf[name];
+      if (typeof orig !== 'function') return;
+      pf[name] = function (...args) {
+        if (zoomLevel > 1) return undefined;
+        return orig.apply(pf, args);
+      };
+    });
+  }
+
+  // 위 메서드 감싸기로 막을 수 없는 경로(터치/마우스 호환 이벤트가 라이브러리
+  // 내부로 새어 들어가 드래그를 서서히 끝까지 끌고 가 완료되는 경우 등)에
+  // 대한 최종 안전망. 확대된 상태에서 페이지가 바뀐 걸 감지하면 원래
+  // 보고 있던 페이지로 즉시 되돌린다 - 원인이 무엇이든 결과적으로 "확대
+  // 중엔 페이지가 안 넘어간다"를 보장한다.
+  let lastSafePageIndex = 0;
+  function enforceNoFlipWhileZoomed() {
+    const idx = pageFlip.getCurrentPageIndex();
+    if (zoomLevel > 1 && idx !== lastSafePageIndex) {
+      pageFlip.turnToPage(lastSafePageIndex);
+      return;
+    }
+    lastSafePageIndex = idx;
+  }
+
   function buildBook() {
     bookEl.innerHTML = '';
     const spread = !isMobile; // 데스크톱/태블릿은 두 페이지 보기, 모바일은 한 페이지
@@ -144,6 +176,7 @@
       usePortrait: !spread,
       maxShadowOpacity: 0.5
     });
+    guardFlipWhileZoomed(pageFlip);
     // 현재 페이지가 단독으로 보이는 페이지(표지=1페이지, 짝이 없는 마지막 페이지)인지
     // 직접 계산해서 클리핑 박스 폭을 맞춘다. (캔버스 실측 폭을 되읽어 맞추면
     // 라이브러리의 자체 반응형 판단과 서로 영향을 주고받아 불안정해짐)
@@ -166,6 +199,10 @@
     }
 
     pageFlip.loadFromImages(urls);
+    // 다른 핸들러보다 먼저 걸어서, 확대 중에 새어 들어온 넘김을 가장
+    // 먼저 되돌린 뒤에 나머지(페이지 표시 갱신 등)가 처리되게 한다.
+    pageFlip.on('flip', enforceNoFlipWhileZoomed);
+    pageFlip.on('init', enforceNoFlipWhileZoomed);
     pageFlip.on('flip', updateIndicator);
     pageFlip.on('init', updateIndicator);
     pageFlip.on('flip', playFlipSound);
@@ -202,8 +239,19 @@
 
   function gotoPage(page) {
     stopAutoplay();
-    pageFlip.flip(Number(page) - 1);
     closeToc();
+    // flip()은 확대 중엔 막혀 있으므로(guardFlipWhileZoomed), 목차/썸네일로
+    // 직접 이동할 때는 먼저 확대를 풀어준다. 줌 리셋과 flip()을 같은 틱에
+    // 바로 이어붙이면 브라우저가 축소 변화를 아직 반영(페인트)하기 전이라
+    // 라이브러리가 넘김에 필요한 치수를 잘못 읽어 조용히 실패하므로, 한
+    // 프레임 기다렸다가 flip을 호출한다.
+    if (zoomLevel > 1) {
+      zoomLevel = 1;
+      applyZoom();
+      requestAnimationFrame(() => pageFlip.flip(Number(page) - 1));
+    } else {
+      pageFlip.flip(Number(page) - 1);
+    }
   }
 
   toc.forEach((item) => {
@@ -632,9 +680,12 @@
     clearTimeout(resizeTimer);
     resizeTimer = setTimeout(() => {
       const currentPage = pageFlip ? pageFlip.getCurrentPageIndex() : 0;
+      // zoomLevel을 먼저 1로 되돌려야, 리빌드 중에 뜨는 flip/init 이벤트에서
+      // enforceNoFlipWhileZoomed가 "확대 중에 페이지가 바뀌었다"고 오판해
+      // currentPage로 되돌리는 turnToPage를 또 호출하는 혼선이 안 생긴다.
+      zoomLevel = 1;
       buildBook();
       pageFlip.turnToPage(currentPage);
-      zoomLevel = 1;
       applyZoom();
     }, 250);
   });
