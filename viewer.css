@@ -22,6 +22,12 @@ body {
   top: 0; left: 0; right: 0; bottom: 0;
   display: flex;
   overflow: auto;
+  /* iOS Safari는 viewport meta의 user-scalable=no를 접근성 때문에 무시하고
+     핀치하면 항상 페이지 자체를 확대해버린다(우리 앱 확대와는 별개로).
+     이게 겹치면 터치 좌표/리사이즈가 꼬여서 의도치 않은 페이지 넘김으로
+     이어질 수 있으므로, 이 영역의 터치 제스처는 전부 JS가 직접 처리하고
+     브라우저 기본 동작(핀치 확대, 스와이프 등)은 전혀 끼어들지 않게 한다. */
+  touch-action: none;
 }
 
 /* #stage에서 align-items/justify-content:center 대신 #book에 margin:auto를
