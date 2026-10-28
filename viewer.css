@@ -78,6 +78,10 @@ body {
 .navArrow:hover { color: rgba(20,20,20,0.85); }
 .navArrowLeft { left: 10px; }
 .navArrowRight { right: 10px; }
+/* 확대 중엔 이 화살표가 화면 양쪽 끝(패닝으로 가장자리를 보려 할 때
+   손가락/커서가 닿는 바로 그 자리)에 떠 있어서, 가장자리로 이동하려다
+   실수로 페이지가 넘어가 버리는 원인이 됐다. 확대 중에는 숨긴다. */
+body.zoomed .navArrow { display: none; }
 
 /* 확대 상태에서 드래그로 화면 이동(패닝)하기 위한 투명 레이어.
    확대 전(100%)에는 꺼둬서 책장 넘기기 드래그와 겹치지 않게 한다. */

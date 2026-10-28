@@ -278,6 +278,17 @@
   });
   applyZoom();
 
+  // ---- 데스크톱: Ctrl(또는 트랙패드 핀치) + 스크롤로 확대/축소 ----
+  // 일반 스크롤은 그대로 둬서(확대 중이면 상하 이동, 아니면 아무 효과 없음)
+  // Ctrl/Cmd를 누른 상태의 스크롤이나 트랙패드 핀치(브라우저가 ctrlKey:true로
+  // 보내줌)일 때만 마우스 커서 위치를 기준으로 확대/축소한다.
+  stageEl.addEventListener('wheel', (e) => {
+    if (!e.ctrlKey) return;
+    e.preventDefault();
+    const factor = Math.exp(-e.deltaY * 0.002);
+    setZoomAroundPoint(zoomLevel * factor, e.clientX, e.clientY);
+  }, { passive: false });
+
   // ---- 확대 상태에서 드래그로 이동(패닝) ----
   let isPanning = false;
   let panStart = { x: 0, y: 0, scrollLeft: 0, scrollTop: 0 };
