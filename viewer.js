@@ -107,14 +107,16 @@
 
   let pageFlip = null;
 
-  // 확대 중에는 빠른 스와이프로 직접 넘기는 flipNext/flipPrev/flip을
-  // 막아둔다. (userMove/userStop까지 감싸면 showCover 모드의 표지 전환
-  // 애니메이션 내부 로직이 깨지는 부작용이 있어 이 셋만 감싼다 - 드래그로
-  // 서서히 넘기다 손을 떼서 완료되는 경로는 아래 enforceNoFlipWhileZoomed로
-  // 별도로 막는다. TOC/썸네일로 직접 이동할 때는 gotoPage()가 먼저
-  // 확대를 풀고 호출하므로 영향 없다.)
+  // 확대 중에는 넘김을 일으키는 경로를 전부 막는다: flipNext/flipPrev/flip은
+  // 빠른 스와이프가 직접 호출하는 경로, userMove는 손가락을 따라 페이지가
+  // 서서히 넘어가는 모습을 그리는 경로다(새어 들어온 터치로 이게 돌면
+  // 실제로는 안 넘어가도 애니메이션만 보여서 넘어간 것처럼 착각하게 된다).
+  // userStop까지 감싸면 showCover 모드의 표지 전환 애니메이션 내부 로직이
+  // 깨지는 부작용이 있어 그건 손대지 않고, 그 경로로 혹시 완료돼버리는
+  // 경우는 아래 enforceNoFlipWhileZoomed가 별도로 되돌린다. TOC/썸네일로
+  // 직접 이동할 때는 gotoPage()가 먼저 확대를 풀고 호출하므로 영향 없다.
   function guardFlipWhileZoomed(pf) {
-    ['flipNext', 'flipPrev', 'flip'].forEach((name) => {
+    ['flipNext', 'flipPrev', 'flip', 'userMove'].forEach((name) => {
       const orig = pf[name];
       if (typeof orig !== 'function') return;
       pf[name] = function (...args) {
