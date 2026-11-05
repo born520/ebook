@@ -44,6 +44,10 @@
   function wantSpread() {
     return window.innerWidth >= 768 || window.innerWidth > window.innerHeight;
   }
+  // 휴대폰에서는 처음 참고했던 이북처럼 툴바를 숨겨두고 화면을 톡 치면 보이게 한다
+  let uiShown = !isMobile;
+  document.body.classList.toggle('mobileUi', isMobile);
+  document.body.classList.toggle('uiShown', uiShown);
   const base = pagesConfig.desktopBase
     ? (isMobile ? pagesConfig.mobileBase : pagesConfig.desktopBase)
     : pagesConfig.base;
@@ -97,8 +101,9 @@
     // 휴대폰 가로는 화면 높이가 낮아서 상하 여백을 줄여 페이지를 최대한 크게 보여준다
     const phoneLandscape = isMobile && spread;
     const marginW = isMobile && !spread ? 8 : (phoneLandscape ? 90 : 100);
-    // 휴대폰 가로에서는 #stage 아래쪽에 툴바 자리(패딩)를 비워두므로 그만큼 + 위아래 약간의 여백
-    const marginH = phoneLandscape ? 100 : (isMobile ? 100 : 110);
+    // 휴대폰 가로: 툴바가 보일 땐 #stage 아래에 툴바 자리(패딩)를 비우고 그 위에만 책을 놓고,
+    // 툴바가 숨겨져 있으면 화면 높이를 거의 다 쓴다
+    const marginH = phoneLandscape ? (uiShown ? 100 : 16) : (isMobile ? 100 : 110);
     const availW = (stage.clientWidth || 960) - marginW;
     const availH = (stage.clientHeight || 720) - marginH;
     const widthFactor = spread ? 2 : 1;
@@ -152,6 +157,7 @@
     const spread = wantSpread(); // PC/태블릿/휴대폰 가로는 두 페이지, 휴대폰 세로는 한 페이지
     // 휴대폰 가로는 화면 높이가 낮아 하단 툴바가 페이지를 가리므로, 툴바 위 영역에만 책을 놓는다
     document.body.classList.toggle('phoneLandscape', isMobile && spread);
+    document.body.classList.toggle('uiSpace', isMobile && spread && uiShown);
     spreadMode = spread;
     const size = computeSize(spread);
     const dpr = Math.min(window.devicePixelRatio || 1, 2);
@@ -184,6 +190,8 @@
       showCover: true,
       mobileScrollSupport: true,
       usePortrait: !spread,
+      // 휴대폰에서 페이지를 톡 치는 건 툴바 보이기/숨기기용. 넘김은 스와이프나 좌우 화살표로 한다.
+      disableFlipByClick: isMobile,
       maxShadowOpacity: 0.5
     });
     guardFlipWhileZoomed(pageFlip);
@@ -471,6 +479,47 @@
   }
   window.addEventListener('touchend', handleTouchEnd, { capture: true });
   window.addEventListener('touchcancel', handleTouchEnd, { capture: true });
+
+  // ---- 휴대폰: 화면을 톡 치면 툴바 보이기/숨기기 ----
+  // 손가락이 거의 움직이지 않고 짧게 닿았다 떨어진 경우만 '탭'으로 본다.
+  // (스와이프로 넘기기, 두 손가락 핀치, 확대 중 드래그 이동은 탭이 아님)
+  if (isMobile) {
+    const TAP_IGNORE = '#bottomBar, #pageIndicator, .navArrow, #tocPanel, #thumbPanel, .scrim';
+    let tapStart = null;
+    let pointersDown = 0;
+    window.addEventListener('pointerdown', (e) => {
+      pointersDown++;
+      tapStart = (pointersDown === 1 && !e.target.closest(TAP_IGNORE))
+        ? { x: e.clientX, y: e.clientY, t: Date.now() } : null;
+    }, true);
+    window.addEventListener('pointercancel', () => { pointersDown = Math.max(0, pointersDown - 1); tapStart = null; }, true);
+    window.addEventListener('pointerup', (e) => {
+      pointersDown = Math.max(0, pointersDown - 1);
+      const s = tapStart;
+      tapStart = null;
+      if (!s || pinchActive) return;
+      if (Math.hypot(e.clientX - s.x, e.clientY - s.y) > 10 || Date.now() - s.t > 350) return;
+      if (document.body.classList.contains('tocOpen') || document.body.classList.contains('thumbOpen')) return;
+      if (document.body.classList.contains('moreOpen')) {
+        document.body.classList.remove('moreOpen');
+        return;
+      }
+      setUiShown(!uiShown);
+    }, true);
+  }
+
+  function setUiShown(show) {
+    uiShown = show;
+    document.body.classList.toggle('uiShown', show);
+    if (!show) document.body.classList.remove('moreOpen');
+    // 휴대폰 가로는 툴바 자리만큼 책 크기가 달라지므로 다시 배치한다(확대 중엔 보던 위치 유지를 위해 생략)
+    if (document.body.classList.contains('phoneLandscape') && zoomLevel === 1) {
+      const currentPage = pageFlip.getCurrentPageIndex();
+      buildBook();
+      pageFlip.turnToPage(currentPage);
+      applyZoom();
+    }
+  }
 
   // ---- 더보기 팝업 ----
   moreBtn.addEventListener('click', (e) => {

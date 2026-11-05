@@ -69,7 +69,16 @@ body {
 
 /* 휴대폰 가로: 화면 높이가 낮아 하단 툴바/페이지 표시가 책을 가리지 않도록
    그 높이만큼 아래를 비우고, 남은 영역 안에서 책을 가운데 놓는다. */
-body.phoneLandscape #stage { padding-bottom: 92px; box-sizing: border-box; }
+body.uiSpace #stage { padding-bottom: 92px; box-sizing: border-box; }
+
+/* 휴대폰: 툴바/페이지 번호는 평소엔 숨기고 화면을 톡 치면 나타난다 */
+#bottomBar, #pageIndicator { transition: opacity 0.2s ease, visibility 0.2s; }
+body.mobileUi:not(.uiShown) #bottomBar,
+body.mobileUi:not(.uiShown) #pageIndicator {
+  opacity: 0;
+  visibility: hidden;
+  pointer-events: none;
+}
 body.phoneLandscape #stage::after { display: none; }
 .navArrow { z-index: 4; }
 
