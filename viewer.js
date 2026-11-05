@@ -27,7 +27,8 @@
   let spreadMode = true;
 
   const params = new URLSearchParams(location.search);
-  const book = params.get('book');
+  // 주소 뒤에 ?book= 이 없으면 기본 책자를 바로 연다 (ebook.shorttime.co.kr 만으로 접속 가능)
+  const book = params.get('book') || 'sme-booklet';
   const prefix = book ? `books/${book}/` : '';
   const bookKey = book || 'default';
 
