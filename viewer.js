@@ -37,7 +37,13 @@
     fetch(prefix + 'toc.json', { cache: 'no-cache' }).then(r => r.json())
   ]);
 
-  const isMobile = window.innerWidth < 768;
+  // 휴대폰 여부는 화면 방향과 관계없이 짧은 변 기준으로 판단한다(이미지 해상도 선택용).
+  // 실제 한 페이지/두 페이지 보기는 wantSpread()가 방향에 따라 매번 다시 정한다.
+  const isMobile = Math.min(window.innerWidth, window.innerHeight) < 768;
+  // 폭이 넓거나(PC/태블릿) 휴대폰을 가로로 눕혔으면 두 페이지 펼침 보기
+  function wantSpread() {
+    return window.innerWidth >= 768 || window.innerWidth > window.innerHeight;
+  }
   const base = pagesConfig.desktopBase
     ? (isMobile ? pagesConfig.mobileBase : pagesConfig.desktopBase)
     : pagesConfig.base;
@@ -88,8 +94,11 @@
     const stage = document.getElementById('stage');
     // 모바일은 내비 버튼이 이미지 위에 떠있는 형태라 여백을 최소화해서 꽉 차게 표시
     // 세로 여백은 하단 플로팅 툴바/페이지 표시 pill과 겹치지 않도록 확보
-    const marginW = isMobile ? 8 : 100;
-    const marginH = isMobile ? 100 : 110;
+    // 휴대폰 가로는 화면 높이가 낮아서 상하 여백을 줄여 페이지를 최대한 크게 보여준다
+    const phoneLandscape = isMobile && spread;
+    const marginW = isMobile && !spread ? 8 : (phoneLandscape ? 90 : 100);
+    // 휴대폰 가로에서는 #stage 아래쪽에 툴바 자리(패딩)를 비워두므로 그만큼 + 위아래 약간의 여백
+    const marginH = phoneLandscape ? 100 : (isMobile ? 100 : 110);
     const availW = (stage.clientWidth || 960) - marginW;
     const availH = (stage.clientHeight || 720) - marginH;
     const widthFactor = spread ? 2 : 1;
@@ -140,7 +149,9 @@
 
   function buildBook() {
     bookEl.innerHTML = '';
-    const spread = !isMobile; // 데스크톱/태블릿은 두 페이지 보기, 모바일은 한 페이지
+    const spread = wantSpread(); // PC/태블릿/휴대폰 가로는 두 페이지, 휴대폰 세로는 한 페이지
+    // 휴대폰 가로는 화면 높이가 낮아 하단 툴바가 페이지를 가리므로, 툴바 위 영역에만 책을 놓는다
+    document.body.classList.toggle('phoneLandscape', isMobile && spread);
     spreadMode = spread;
     const size = computeSize(spread);
     const dpr = Math.min(window.devicePixelRatio || 1, 2);
@@ -621,7 +632,7 @@
 
   // ---- 리사이즈 대응 (간단 버전: 디바운스 후 재생성) ----
   let resizeTimer;
-  window.addEventListener('resize', () => {
+  function onViewportChange() {
     clearTimeout(resizeTimer);
     resizeTimer = setTimeout(() => {
       const currentPage = pageFlip ? pageFlip.getCurrentPageIndex() : 0;
@@ -633,5 +644,11 @@
       pageFlip.turnToPage(currentPage);
       applyZoom();
     }, 250);
-  });
+  }
+  window.addEventListener('resize', onViewportChange);
+  // 휴대폰을 돌렸을 때 일부 브라우저는 resize가 늦거나 안 오는 경우가 있어 방향 전환도 함께 받는다
+  window.addEventListener('orientationchange', onViewportChange);
+  if (screen.orientation && screen.orientation.addEventListener) {
+    screen.orientation.addEventListener('change', onViewportChange);
+  }
 })();
