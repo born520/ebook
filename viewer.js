@@ -24,15 +24,11 @@
   const soundBtn = document.getElementById('soundBtn');
   const autoplayBtn = document.getElementById('autoplayBtn');
 
-  // 업체소개 페이지 QR코드 클릭 영역용. applyZoom()이 아직 정의되지 않은
-  // 시점에도 안전하게 참조할 수 있도록 여기서 미리 선언해둔다.
-  let qrHotspot = null;
-  let qrMap = {};
   let spreadMode = true;
 
   const params = new URLSearchParams(location.search);
-  const book = params.get('book') || 'sme-booklet';
-  const prefix = `books/${book}/`;
+  const book = params.get('book');
+  const prefix = book ? `books/${book}/` : '';
   const bookKey = book || 'default';
 
   const [pagesConfig, toc] = await Promise.all([
@@ -210,8 +206,6 @@
     pageFlip.on('flip', playFlipSound);
     pageFlip.on('flip', syncBookWidth);
     pageFlip.on('init', syncBookWidth);
-    pageFlip.on('flip', updateQrHotspot);
-    pageFlip.on('init', updateQrHotspot);
   }
 
   buildBook();
@@ -309,7 +303,6 @@
     zoomInBtn.disabled = zoomLevel >= ZOOM_MAX;
     zoomOutBtn.disabled = zoomLevel <= ZOOM_MIN;
     document.body.classList.toggle('zoomed', zoomLevel > 1);
-    updateQrHotspot();
   }
 
   // 버튼 확대/축소도 핀치와 동일하게 "현재 화면 중앙" 기준으로 확대해서,
@@ -346,7 +339,6 @@
   function panTo(clientX, clientY) {
     stageEl.scrollLeft = panStart.scrollLeft - (clientX - panStart.x);
     stageEl.scrollTop = panStart.scrollTop - (clientY - panStart.y);
-    updateQrHotspot();
   }
 
   dragLayer.addEventListener('mousedown', (e) => {
@@ -467,56 +459,6 @@
   }
   window.addEventListener('touchend', handleTouchEnd, { capture: true });
   window.addEventListener('touchcancel', handleTouchEnd, { capture: true });
-
-  // ---- 업체소개 페이지 QR코드 클릭 -> 홈페이지 링크 열기 ----
-  fetch(prefix + 'qrlinks.json', { cache: 'no-cache' })
-    .then((r) => (r.ok ? r.json() : {}))
-    .then((d) => { qrMap = d || {}; updateQrHotspot(); })
-    .catch(() => {});
-
-  qrHotspot = document.createElement('a');
-  qrHotspot.id = 'qrHotspot';
-  qrHotspot.target = '_blank';
-  qrHotspot.rel = 'noopener noreferrer';
-  qrHotspot.addEventListener('click', (e) => e.stopPropagation());
-  document.body.appendChild(qrHotspot);
-
-  // showCover 짝짓기 규칙과 동일하게, 현재 페이지 인덱스(0-based)로부터
-  // 지금 화면에 보이는 페이지 번호(1-based)들을 계산한다.
-  function pagesInCurrentSpread(idx0) {
-    if (!spreadMode) return [idx0 + 1];
-    if (idx0 === 0) return [1];
-    if (idx0 === pagesConfig.total - 1 && pagesConfig.total % 2 === 0) return [pagesConfig.total];
-    const k = Math.floor((idx0 - 1) / 2);
-    return [2 + 2 * k, 3 + 2 * k];
-  }
-
-  function updateQrHotspot() {
-    if (!qrHotspot || !pageFlip) return;
-    const pagesShown = pagesInCurrentSpread(pageFlip.getCurrentPageIndex());
-    const qrPage = pagesShown.find((p) => qrMap[p]);
-    const data = qrPage ? qrMap[qrPage] : null;
-    if (!data) { qrHotspot.style.display = 'none'; return; }
-
-    const rect = bookEl.getBoundingClientRect();
-    const slotWidth = rect.width / pagesShown.length;
-    const slotLeft = rect.left + pagesShown.indexOf(qrPage) * slotWidth;
-
-    // 정확한 QR 픽셀 영역보다 살짝 여유를 둬서 탭하기 쉽게 한다.
-    const padX = data.w * 0.15;
-    const padY = data.h * 0.15;
-    const x = Math.max(0, data.x - padX);
-    const y = Math.max(0, data.y - padY);
-    const w = Math.min(1 - x, data.w + padX * 2);
-    const h = Math.min(1 - y, data.h + padY * 2);
-
-    qrHotspot.style.display = 'block';
-    qrHotspot.style.left = (slotLeft + x * slotWidth) + 'px';
-    qrHotspot.style.top = (rect.top + y * rect.height) + 'px';
-    qrHotspot.style.width = (w * slotWidth) + 'px';
-    qrHotspot.style.height = (h * rect.height) + 'px';
-    qrHotspot.href = data.url;
-  }
 
   // ---- 더보기 팝업 ----
   moreBtn.addEventListener('click', (e) => {
