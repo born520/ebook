@@ -220,10 +220,22 @@
       mobileScrollSupport: true,
       usePortrait: !spread,
       // 휴대폰에서 페이지를 톡 치는 건 툴바 보이기/숨기기용. 넘김은 스와이프나 좌우 화살표로 한다.
-      disableFlipByClick: isMobile,
+      // (주의) disableFlipByClick: true 는 이전 페이지(왼쪽) 넘김까지 막아서 쓰지 않는다.
+      //  탭 넘김만 아래에서 따로 막는다.
+      disableFlipByClick: false,
       maxShadowOpacity: 0.5
     });
     guardFlipWhileZoomed(pageFlip);
+    if (isMobile) {
+      // 휴대폰: 화면을 톡 치는 건 툴바용. 손가락이 끌려 움직이지 않은 터치(탭)는
+      // 라이브러리의 '탭 → 넘김'으로 보내지 않는다. 스와이프(isUserMove)와
+      // 좌우 화살표(flipNext/flipPrev)는 그대로 동작한다.
+      const stopWithGuard = pageFlip.userStop;
+      pageFlip.userStop = function (...args) {
+        if (!pageFlip.isUserMove) { pageFlip.isUserTouch = false; return undefined; }
+        return stopWithGuard.apply(pageFlip, args);
+      };
+    }
     // 현재 페이지가 단독으로 보이는 페이지(표지=1페이지, 짝이 없는 마지막 페이지)인지
     // 직접 계산해서 클리핑 박스 폭을 맞춘다. (캔버스 실측 폭을 되읽어 맞추면
     // 라이브러리의 자체 반응형 판단과 서로 영향을 주고받아 불안정해짐)
