@@ -54,7 +54,7 @@
 
   const urls = [];
   for (let i = 1; i <= pagesConfig.total; i++) {
-    urls.push(`${prefix}${base}${i}.${pagesConfig.ext}`);
+    urls.push(`${prefix}${base}${i}.${pagesConfig.ext}${pagesConfig.imgVersion ? '?v=' + pagesConfig.imgVersion : ''}`);
   }
 
   // ---- 썸네일 그리드 (책에서 이미 받은 이미지를 재사용, 추가 다운로드 없음) ----

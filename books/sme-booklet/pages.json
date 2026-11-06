@@ -2,5 +2,6 @@
   "total": 142,
   "desktopBase": "images/desktop/",
   "mobileBase": "images/mobile/",
-  "ext": "webp"
+  "ext": "webp",
+  "imgVersion": 2
 }
