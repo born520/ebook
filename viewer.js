@@ -126,15 +126,44 @@
   // 깨지는 부작용이 있어 그건 손대지 않고, 그 경로로 혹시 완료돼버리는
   // 경우는 아래 enforceNoFlipWhileZoomed가 별도로 되돌린다. TOC/썸네일로
   // 직접 이동할 때는 gotoPage()가 먼저 확대를 풀고 호출하므로 영향 없다.
+  //
+  // [2026-11-06 보완] userMove만 막으면 라이브러리의 isUserMove가 false로 남아,
+  // 손을 떼는 순간 userStop()이 그 터치를 "모서리 탭"으로 보고
+  // flipController.flip()(클릭 넘김 애니메이션)을 실행한다. 확대한 채 가장자리를
+  // 보다 손을 떼면 넘김 애니메이션이 뜨던 원인이다(페이지는 위 안전망이 되돌림).
+  // 그래서 확대/핀치 중에는 터치의 시작(startUserTouch)과 끝(userStop)도
+  // 라이브러리에 전달하지 않고, 확대가 시작되는 순간 이미 기록된 터치는
+  // cancelLibraryTouch()로 지운다. 확대가 아닐 때는 원래 동작 그대로라
+  // showCover 표지 전환 등에는 영향이 없다.
+  function zoomOrPinch() {
+    return zoomLevel > 1 || pinchActive;
+  }
   function guardFlipWhileZoomed(pf) {
-    ['flipNext', 'flipPrev', 'flip', 'userMove'].forEach((name) => {
+    ['flipNext', 'flipPrev', 'flip', 'userMove', 'startUserTouch'].forEach((name) => {
       const orig = pf[name];
       if (typeof orig !== 'function') return;
       pf[name] = function (...args) {
-        if (zoomLevel > 1) return undefined;
+        if (zoomOrPinch()) return undefined;
         return orig.apply(pf, args);
       };
     });
+    const origStop = pf.userStop;
+    if (typeof origStop === 'function') {
+      pf.userStop = function (...args) {
+        if (zoomOrPinch()) { cancelLibraryTouch(); return undefined; }
+        return origStop.apply(pf, args);
+      };
+    }
+  }
+  // 라이브러리에 남아 있는 진행 중 터치를 애니메이션 없이 지운다.
+  // 확대 전에 이미 페이지를 조금 끌어 접힌 상태였다면 제자리로 되돌린다.
+  function cancelLibraryTouch() {
+    if (!pageFlip) return;
+    if (pageFlip.isUserMove && pageFlip.flipController && typeof pageFlip.flipController.stopMove === 'function') {
+      pageFlip.flipController.stopMove();
+    }
+    pageFlip.isUserTouch = false;
+    pageFlip.isUserMove = false;
   }
 
   // 위 메서드 감싸기로 막을 수 없는 경로(터치/마우스 호환 이벤트가 라이브러리
@@ -323,6 +352,7 @@
     zoomInBtn.disabled = zoomLevel >= ZOOM_MAX;
     zoomOutBtn.disabled = zoomLevel <= ZOOM_MIN;
     document.body.classList.toggle('zoomed', zoomLevel > 1);
+    if (zoomLevel > 1) cancelLibraryTouch();
   }
 
   // 버튼 확대/축소도 핀치와 동일하게 "현재 화면 중앙" 기준으로 확대해서,
@@ -446,6 +476,7 @@
     stopAutoplay();
     isPanning = false;
     pinchActive = true;
+    cancelLibraryTouch(); // 첫 손가락이 확대 전에 남긴 라이브러리 터치 기록 제거
     pinchStartDist = touchDist(e.touches);
     pinchStartZoom = zoomLevel;
     bookEl.classList.add('noTransition');
